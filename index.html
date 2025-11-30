@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PromptCraft</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load React, ReactDOM, and Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+      /* Apply Inter font */
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      /* Custom scrollbar styling for dark mode */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #020617; /* slate-950 */
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #334155; /* slate-700 */
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #475569; /* slate-600 */
+      }
+    </style>
+</head>
+<body class="bg-slate-950">
+    <div id="root"></div>
+
+    <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+    
+    // Inline definitions for Lucide icons (or equivalents)
+    // To ensure portability without importing the library
+    const Icon = ({ children, size = 20, className = 'text-white' }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        {children}
+      </svg>
+    );
+
+    const Sparkles = (props) => (
+        <Icon {...props}><path d="m12 3-1.92 5.8a2 2 0 0 1-1.27 1.27L3 12l5.8 1.92a2 2 0 0 1 1.27 1.27L12 21l1.92-5.8a2 2 0 0 1 1.27-1.27L21 12l-5.8-1.92a2 2 0 0 1-1.27-1.27Z" /></Icon>
+    );
+    const Copy = (props) => (
+        <Icon {...props}><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></Icon>
+    );
+    const Code = (props) => (
+        <Icon {...props}><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></Icon>
+    );
+    const PenTool = (props) => (
+        <Icon {...props}><path d="M12 19l7-7 3 3-7 7-3-3z" /><path d="M18 13l-1.5-1.5" /><path d="M12 21V12" /><path d="M16 17H5" /><path d="M5 12h11" /><path d="M12 3l7 7 3-3-7-7-3 3z" /></Icon>
+    );
+    const Briefcase = (props) => (
+        <Icon {...props}><rect width="20" height="14" x="2" y="7" rx="2" ry="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></Icon>
+    );
+    const ImageIcon = (props) => (
+        <Icon {...props}><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-4.5-4.5L9 21" /></Icon>
+    );
+    const Check = (props) => (
+        <Icon {...props}><polyline points="20 6 9 17 4 12" /></Icon>
+    );
+    const Terminal = (props) => (
+        <Icon {...props}><polyline points="4 17 10 17 4 12 10 7" /><line x1="12" x2="20" y1="17" y2="17" /></Icon>
+    );
+    const Zap = (props) => (
+        <Icon {...props}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></Icon>
+    );
+    const RotateCcw = (props) => (
+        <Icon {...props}><path d="M1 4v6h6" /><path d="M22 20v-6h-6" /><path d="M22 14c-1.5 5-5 9-11 9s-9.5-4-11-9" /><path d="M2 10c1.5-5 5-9 11-9s9.5 4 11 9" /></Icon>
+    );
+    const Save = (props) => (
+        <Icon {...props}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></Icon>
+    );
+    const Trash2 = (props) => (
+        <Icon {...props}><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></Icon>
+    );
+    const ChevronRight = (props) => (
+        <Icon {...props}><polyline points="9 18 15 12 9 6" /></Icon>
+    );
+    const Wand2 = (props) => (
+        <Icon {...props}><path d="M21 7.5l-2-2" /><path d="M17 11l-2-2" /><path d="M15 15l-1.5-1.5" /><path d="M19 19l-1.5-1.5" /><path d="M11.5 13.5l-2-2" /><path d="M9.5 11.5l-2-2" /><path d="M1.5 21.5l1.7-1.7" /><path d="M5.2 17.8l1.7-1.7" /><path d="M14 4l-4 4" /><path d="M13 10l-4 4" /></Icon>
+    );
+    
+    // Main React Component
+    const App = () => {
+      // --- State Management ---
+      const [idea, setIdea] = useState('');
+      const [category, setCategory] = useState('coding'); // coding, writing, business, art
+      const [complexity, setComplexity] = useState('expert'); // beginner, intermediate, expert
+      const [tone, setTone] = useState('professional');
+      const [includeReasoning, setIncludeReasoning] = useState(true);
+      const [includeCritique, setIncludeCritique] = useState(false);
+      const [generatedPrompt, setGeneratedPrompt] = useState('');
+      const [isGenerating, setIsGenerating] = useState(false);
+      const [history, setHistory] = useState([]);
+      const [showCopied, setShowCopied] = useState(false);
+      const [activeTab, setActiveTab] = useState('builder'); // builder, history
+
+      // --- Constants & Templates ---
+      
+      const categories = [
+        { id: 'coding', name: 'Software & Code', icon: <Code size={20} />, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30' },
+        { id: 'writing', name: 'Content & Writing', icon: <PenTool size={20} />, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/30' },
+        { id: 'business', name: 'Strategy & Biz', icon: <Briefcase size={20} />, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
+        { id: 'art', name: 'Image Gen (DALL-E/MJ)', icon: <ImageIcon size={20} />, color: 'text-pink-400', bg: 'bg-pink-500/10', border: 'border-pink-500/30' },
+      ];
+
+      const complexities = [
+        { id: 'beginner', label: 'Simple / Beginner' },
+        { id: 'intermediate', label: 'Detailed / Intermediate' },
+        { id: 'expert', label: 'Complex / Expert' },
+      ];
+
+      // --- Logic ---
+
+      const generatePrompt = () => {
+        if (!idea.trim()) return;
+        
+        setIsGenerating(true);
+        
+        // Simulate thinking time for effect
+        setTimeout(() => {
+          let corePrompt = "";
+          
+          // 1. PERSONA LAYER
+          if (category === 'coding') {
+            corePrompt += `Act as a Staff Software Engineer and Technical Architect with deep expertise in modern web stacks, algorithm design, and system architecture. Your code should be clean, modular, well-commented, and production-ready.\n\n`;
+          } else if (category === 'writing') {
+            corePrompt += `Act as a Pulitzer Prize-winning Editor and Copywriter. Your writing is engaging, error-free, persuasive, and perfectly tailored to the target audience. Focus on flow, tone, and clarity.\n\n`;
+          } else if (category === 'business') {
+            corePrompt += `Act as a Senior Strategy Consultant (McKinsey/Bain style) and Product Manager. You analyze problems using frameworks, data-driven insights, and actionable strategic planning.\n\n`;
+          } else if (category === 'art') {
+            corePrompt += `Act as an expert Prompt Engineer for Generative AI Art models (Midjourney v6, DALL-E 3). You understand lighting, composition, camera lenses, and artistic styles deeply.\n\n`;
+          }
+
+          // 2. CONTEXT & TASK LAYER
+          corePrompt += `## OBJECTIVE\nYour task is to execute the following request with the highest degree of precision:\n"${idea}"\n\n`;
+
+          // 3. CONSTRAINTS & FORMATTING LAYER
+          corePrompt += `## REQUIREMENTS & CONSTRAINTS\n`;
+          if (category === 'coding') {
+            corePrompt += `- Use modern syntax and best practices.\n- Handle edge cases and errors robustly.\n- If generating a web app, ensure it is responsive and accessible.\n- Prefer functional programming patterns where applicable.\n- format: Single file or clearly separated code blocks.\n`;
+            if (complexity === 'expert') corePrompt += `- optimize for Big O time/space complexity.\n- Include unit test examples.\n`;
+          } else if (category === 'writing') {
+            corePrompt += `- Tone: ${tone}.\n- Avoid fluff, clichés, and passive voice.\n- Use strong verbs and evocative language.\n- Structure with clear headings and bullet points where appropriate.\n`;
+          } else if (category === 'business') {
+            corePrompt += `- Use a professional, authoritative tone (${tone}).\n- Focus on ROI and actionable steps.\n- Anticipate potential risks and offer mitigation strategies.\n`;
+          } else if (category === 'art') {
+            corePrompt += `- Specify aspect ratio, lighting, chaos parameter, and style reference.\n- Focus on visual descriptors (texture, color palette, angle).\n- Avoid abstract concepts; be concrete.\n`;
+          }
+
+          // 4. CHAIN OF THOUGHT / REASONING (The "Secret Sauce" for good AI results)
+          if (includeReasoning && category !== 'art') {
+            corePrompt += `\n## THINKING PROCESS\nBefore generating the final output, briefly outline your step-by-step reasoning or plan. Break down the problem to ensure no details are missed.\n`;
+          }
+
+          // 5. CRITIQUE LAYER (Self-Correction)
+          if (includeCritique && category !== 'art') {
+            corePrompt += `\n## QUALITY CHECK\nReview your output before finalizing. Ensure it strictly adheres to the constraints above. If there are trade-offs, explain them.\n`;
+          }
+
+          // 6. FINAL TRIGGER
+          corePrompt += `\n## FINAL OUTPUT\nProduce the final result below:`;
+
+          setGeneratedPrompt(corePrompt);
+          setIsGenerating(false);
+          
+          // Add to history
+          const newEntry = {
+            id: Date.now(),
+            idea: idea.substring(0, 30) + (idea.length > 30 ? '...' : ''),
+            fullPrompt: corePrompt,
+            category: category,
+            timestamp: new Date().toLocaleTimeString()
+          };
+          setHistory(prev => [newEntry, ...prev].slice(0, 10)); // Keep last 10
+        }, 800);
+      };
+
+      const copyToClipboard = () => {
+        // Fallback to execCommand for iframe/strict permission environments
+        const textArea = document.createElement("textarea");
+        textArea.value = generatedPrompt;
+        
+        // Use minimal styling to prevent visible flash or layout shift
+        textArea.style.position = 'fixed';
+        textArea.style.top = 0;
+        textArea.style.left = 0;
+        textArea.style.width = '2em';
+        textArea.style.height = '2em';
+        textArea.style.padding = 0;
+        textArea.style.border = 'none';
+        textArea.style.outline = 'none';
+        textArea.style.boxShadow = 'none';
+        textArea.style.background = 'transparent';
+
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+          document.execCommand('copy');
+          setShowCopied(true);
+          setTimeout(() => setShowCopied(false), 2000);
+        } catch (err) {
+          console.error('Fallback: Oops, unable to copy', err);
+        }
+
+        document.body.removeChild(textArea);
+      };
+
+      const loadFromHistory = (entry) => {
+        setGeneratedPrompt(entry.fullPrompt);
+        setCategory(entry.category);
+        setActiveTab('builder');
+      };
+
+      const deleteHistoryItem = (e, id) => {
+        e.stopPropagation();
+        setHistory(prev => prev.filter(item => item.id !== id));
+      };
+
+      // --- Components ---
+
+      const Header = () => (
+        <div className="mb-8 text-center space-y-2">
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <div className="p-3 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-xl shadow-lg shadow-indigo-500/20">
+              <Sparkles className="text-white" size={24} />
+            </div>
+            <h1 className="text-3xl font-bold text-white tracking-tight">PromptCraft</h1>
+          </div>
+          <p className="text-slate-400 max-w-md mx-auto">
+            Transform vague ideas into engineered "Mega-Prompts" that get perfect results from AI on the first try.
+          </p>
+        </div>
+      );
+
+      return (
+        <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-indigo-500/30">
+          <div className="max-w-4xl mx-auto px-4 py-8 md:py-12">
+            <Header />
+
+            {/* Navigation Tabs */}
+            <div className="flex justify-center mb-6">
+              <div className="bg-slate-900/50 p-1 rounded-xl inline-flex border border-slate-800">
+                <button 
+                  onClick={() => setActiveTab('builder')}
+                  className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'builder' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Prompt Builder
+                </button>
+                <button 
+                  onClick={() => setActiveTab('history')}
+                  className={`px-6 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'history' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  History <span className="text-xs bg-slate-700 px-1.5 py-0.5 rounded-full">{history.length}</span>
+                </button>
+              </div>
+            </div>
+
+            {activeTab === 'builder' ? (
+              <div className="grid md:grid-cols-2 gap-6">
+                
+                {/* LEFT COLUMN: Input Configuration */}
+                <div className="space-y-6">
+                  
+                  {/* Category Selector */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        onClick={() => setCategory(cat.id)}
+                        className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all duration-200 ${
+                          category === cat.id 
+                            ? `${cat.bg} ${cat.border} ring-1 ring-inset ring-white/10` 
+                            : 'bg-slate-900 border-slate-800 hover:border-slate-700 hover:bg-slate-800/50'
+                        }`}
+                      >
+                        <div className={`mb-2 ${category === cat.id ? cat.color : 'text-slate-400'}`}>
+                          {cat.icon}
+                        </div>
+                        <span className={`text-xs font-medium ${category === cat.id ? 'text-white' : 'text-slate-400'}`}>
+                          {cat.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Main Input */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-400 ml-1">Your Idea (Be raw & messy)</label>
+                    <textarea
+                      value={idea}
+                      onChange={(e) => setIdea(e.target.value)}
+                      placeholder={
+                        category === 'coding' ? "e.g., A python script that scrapes stock prices..." :
+                        category === 'art' ? "e.g., A cyberpunk city with neon rain..." :
+                        "e.g., Explain quantum physics to a 5 year old..."
+                      }
+                      className="w-full h-32 bg-slate-900 border border-slate-800 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all placeholder:text-slate-600 resize-none"
+                    />
+                  </div>
+
+                  {/* Fine Tuning Controls */}
+                  <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-400">Complexity</span>
+                      <div className="flex gap-1 bg-slate-950 p-1 rounded-lg">
+                        {complexities.map((lvl) => (
+                          <button
+                            key={lvl.id}
+                            onClick={() => setComplexity(lvl.id)}
+                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                              complexity === lvl.id 
+                              ? 'bg-indigo-600 text-white shadow-sm' 
+                              : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                          >
+                            {lvl.id.charAt(0).toUpperCase() + lvl.id.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {category !== 'art' && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-400">Tone</span>
+                        <select 
+                          value={tone}
+                          onChange={(e) => setTone(e.target.value)}
+                          className="bg-slate-950 text-slate-300 text-xs px-3 py-1.5 rounded-md border border-slate-800 focus:outline-none focus:border-indigo-500"
+                        >
+                          <option value="professional">Professional</option>
+                          <option value="casual">Casual & Friendly</option>
+                          <option value="academic">Academic / Strict</option>
+                          <option value="witty">Witty / Humorous</option>
+                          <option value="persuasive">Persuasive / Sales</option>
+                        </select>
+                      </div>
+                    )}
+                    
+                    <div className="pt-2 border-t border-slate-800 flex flex-col gap-2">
+                      <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800/50 cursor-pointer group">
+                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${includeReasoning ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600 group-hover:border-slate-500'}`}>
+                          {includeReasoning && <Check size={14} className="text-white" />}
+                        </div>
+                        <input type="checkbox" className="hidden" checked={includeReasoning} onChange={() => setIncludeReasoning(!includeReasoning)} />
+                        <div>
+                          <span className="text-sm text-slate-300 block">Chain of Thought</span>
+                          <span className="text-xs text-slate-500">Forces AI to plan before answering (Higher quality).</span>
+                        </div>
+                      </label>
+
+                      <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800/50 cursor-pointer group">
+                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${includeCritique ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600 group-hover:border-slate-500'}`}>
+                          {includeCritique && <Check size={14} className="text-white" />}
+                        </div>
+                        <input type="checkbox" className="hidden" checked={includeCritique} onChange={() => setIncludeCritique(!includeCritique)} />
+                        <div>
+                          <span className="text-sm text-slate-300 block">Self-Critique</span>
+                          <span className="text-xs text-slate-500">AI reviews its own work for errors.</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Generate Button */}
+                  <button
+                    onClick={generatePrompt}
+                    disabled={!idea.trim() || isGenerating}
+                    className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <RotateCcw className="animate-spin" size={20} /> Optimizing...
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 size={20} /> Generate Mega-Prompt
+                      </>
+                    )}
+                  </button>
+
+                </div>
+
+                {/* RIGHT COLUMN: Output Area */}
+                <div className="relative h-full min-h-[500px] bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col">
+                  <div className="bg-slate-950/50 border-b border-slate-800 p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Terminal size={16} className="text-slate-500" />
+                      <span className="text-xs font-mono text-slate-400">output_prompt.md</span>
+                    </div>
+                    {generatedPrompt && (
+                      <button 
+                        onClick={copyToClipboard}
+                        className="flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        {showCopied ? <Check size={14} /> : <Copy size={14} />}
+                        {showCopied ? 'Copied!' : 'Copy Prompt'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex-1 p-5 overflow-y-auto font-mono text-sm leading-relaxed text-slate-300">
+                    {generatedPrompt ? (
+                      <div className="whitespace-pre-wrap animate-in fade-in duration-500">
+                        {generatedPrompt}
+                      </div>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-4">
+                        <div className="w-16 h-16 rounded-full bg-slate-800/50 flex items-center justify-center">
+                          <Zap size={24} className="text-slate-500" />
+                        </div>
+                        <p className="text-center max-w-xs">
+                          Enter your idea on the left and hit generate to see the optimized prompt structure here.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Output Footer tips */}
+                  {generatedPrompt && (
+                    <div className="bg-emerald-900/10 border-t border-emerald-500/10 p-3 text-xs text-emerald-400 flex items-center gap-2">
+                      <Check size={12} />
+                      <span>Ready to paste into ChatGPT, Claude, or Gemini.</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              // HISTORY TAB
+              <div className="max-w-2xl mx-auto space-y-4 animate-in slide-in-from-bottom-4 fade-in duration-300">
+                {history.length === 0 ? (
+                  <div className="text-center py-20 text-slate-500">
+                    <Save size={40} className="mx-auto mb-4 opacity-20" />
+                    <p>No history yet. Generate your first prompt!</p>
+                  </div>
+                ) : (
+                  history.map((item) => (
+                    <div 
+                      key={item.id} 
+                      onClick={() => loadFromHistory(item)}
+                      className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-600 transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-slate-800 ${
+                            item.category === 'coding' ? 'text-blue-400' :
+                            item.category === 'writing' ? 'text-purple-400' :
+                            item.category === 'business' ? 'text-emerald-400' : 'text-pink-400'
+                          }`}>
+                            {item.category}
+                          </span>
+                          <span className="text-xs text-slate-500">{item.timestamp}</span>
+                        </div>
+                        <button 
+                          onClick={(e) => deleteHistoryItem(e, item.id)}
+                          className="text-slate-600 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-all"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      <h3 className="font-medium text-slate-200 mb-1">{item.idea}</h3>
+                      <div className="flex items-center text-indigo-400 text-xs font-medium mt-3 gap-1 group-hover:translate-x-1 transition-transform">
+                        Load this prompt <ChevronRight size={12} />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // Render the component
+    const container = document.getElementById('root');
+    const root = ReactDOM.createRoot(container);
+    root.render(<App />);
+    </script>
+</body>
+</html>

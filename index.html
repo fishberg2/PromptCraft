@@ -41,7 +41,7 @@
     const { useState, useEffect, useRef } = React;
     
     // --- Gemini API Setup ---
-    const apiKey = ""; // API key is provided by the environment
+    const APIKEY = ""; // API key is provided by the environment
     
     // Helper function for exponential backoff retry logic
     const makeApiCall = async (url, options, retries = 3) => {
@@ -537,5 +537,6 @@
     </script>
 </body>
 </html>
+
 
 

@@ -40,8 +40,36 @@
     <script type="text/babel">
     const { useState, useEffect, useRef } = React;
     
+    // --- Gemini API Setup ---
+    const apiKey = ""; // API key is provided by the environment
+    
+    // Helper function for exponential backoff retry logic
+    const makeApiCall = async (url, options, retries = 3) => {
+        for (let i = 0; i < retries; i++) {
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    // If 429 (Rate Limit), try again
+                    if (response.status === 429 && i < retries - 1) {
+                        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    throw new Error(`API call failed with status: ${response.status}`);
+                }
+                return response.json();
+            } catch (error) {
+                if (i === retries - 1) {
+                    console.error("API call failed after multiple retries:", error);
+                    throw error;
+                }
+                const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    };
+
     // Inline definitions for Lucide icons (or equivalents)
-    // To ensure portability without importing the library
     const Icon = ({ children, size = 20, className = 'text-white' }) => (
       <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         {children}
@@ -121,70 +149,87 @@
         { id: 'expert', label: 'Complex / Expert' },
       ];
 
-      // --- Logic ---
+      // --- Logic: Gemini LLM Integration ---
 
-      const generatePrompt = () => {
-        if (!idea.trim()) return;
+      const generatePrompt = async () => {
+        if (!idea.trim()) {
+            setGeneratedPrompt("Please enter your idea before generating a prompt.");
+            return;
+        }
         
         setIsGenerating(true);
+        setGeneratedPrompt('');
+
+        // 1. Construct the System Instruction (The AI's Persona and Rules)
+        let systemInstruction = "You are an expert Prompt Engineer. Your task is to take a vague user idea and transform it into a highly detailed, multi-section 'Mega-Prompt' optimized for Large Language Models (LLMs) like yourself.\n\n";
+
+        // Dynamic Persona based on category
+        if (category === 'coding') {
+            systemInstruction += `PERSONA: Act as a Staff Software Engineer and Technical Architect with deep expertise in modern web stacks, algorithm design, and system architecture. Your generated code should be clean, modular, well-commented, and production-ready.`;
+        } else if (category === 'writing') {
+            systemInstruction += `PERSONA: Act as a Pulitzer Prize-winning Editor and Copywriter. Your writing must be engaging, error-free, persuasive, and perfectly tailored to the target audience. Focus on flow, tone, and clarity.`;
+        } else if (category === 'business') {
+            systemInstruction += `PERSONA: Act as a Senior Strategy Consultant and Product Manager. You analyze problems using frameworks, data-driven insights, and actionable strategic planning.`;
+        } else if (category === 'art') {
+            systemInstruction += `PERSONA: Act as an expert Prompt Engineer for Generative AI Art models (e.g., Midjourney, DALL-E 3). You must specify lighting, composition, camera lenses, and artistic styles deeply.`;
+        }
+
+        // Dynamic Complexity and Tone
+        systemInstruction += `\n\nCOMPLEXITY LEVEL: ${complexity.toUpperCase()}. The generated prompt must match this level of detail.`;
+        if (category !== 'art') {
+            systemInstruction += `\nTONE: ${tone.charAt(0).toUpperCase() + tone.slice(1)}.`;
+        }
+
+        // Structure Definition (Mandatory sections)
+        systemInstruction += "\n\nOUTPUT FORMAT (MANDATORY):\nYour output MUST strictly follow this Markdown format:\n";
+        systemInstruction += "## OBJECTIVE\n[Restate the user's request as a clear, concise task.]\n\n";
+        systemInstruction += "## REQUIREMENTS & CONSTRAINTS\n[Generate a bulleted list of highly specific technical or creative constraints.]\n";
         
-        // Simulate thinking time for effect
-        setTimeout(() => {
-          let corePrompt = "";
-          
-          // 1. PERSONA LAYER
-          if (category === 'coding') {
-            corePrompt += `Act as a Staff Software Engineer and Technical Architect with deep expertise in modern web stacks, algorithm design, and system architecture. Your code should be clean, modular, well-commented, and production-ready.\n\n`;
-          } else if (category === 'writing') {
-            corePrompt += `Act as a Pulitzer Prize-winning Editor and Copywriter. Your writing is engaging, error-free, persuasive, and perfectly tailored to the target audience. Focus on flow, tone, and clarity.\n\n`;
-          } else if (category === 'business') {
-            corePrompt += `Act as a Senior Strategy Consultant (McKinsey/Bain style) and Product Manager. You analyze problems using frameworks, data-driven insights, and actionable strategic planning.\n\n`;
-          } else if (category === 'art') {
-            corePrompt += `Act as an expert Prompt Engineer for Generative AI Art models (Midjourney v6, DALL-E 3). You understand lighting, composition, camera lenses, and artistic styles deeply.\n\n`;
-          }
+        if (includeReasoning && category !== 'art') {
+            systemInstruction += "\n## THINKING PROCESS (Mandatory Section)\n[Briefly outline the step-by-step reasoning or plan to solve the objective.]\n";
+        }
+        
+        if (includeCritique && category !== 'art') {
+            systemInstruction += "\n## QUALITY CHECK (Mandatory Section)\n[A self-review checklist to ensure the resulting output meets all constraints.]\n";
+        }
+        
+        systemInstruction += "\n## FINAL OUTPUT INSTRUCTION\n[A final, single instruction telling the AI what to produce, e.g., 'NOW, produce the requested code.' or 'NOW, write the final strategy document.'].";
 
-          // 2. CONTEXT & TASK LAYER
-          corePrompt += `## OBJECTIVE\nYour task is to execute the following request with the highest degree of precision:\n"${idea}"\n\n`;
+        try {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [{ parts: [{ text: `User's initial idea to expand: "${idea}"` }] }],
+                systemInstruction: { parts: [{ text: systemInstruction }] },
+            };
 
-          // 3. CONSTRAINTS & FORMATTING LAYER
-          corePrompt += `## REQUIREMENTS & CONSTRAINTS\n`;
-          if (category === 'coding') {
-            corePrompt += `- Use modern syntax and best practices.\n- Handle edge cases and errors robustly.\n- If generating a web app, ensure it is responsive and accessible.\n- Prefer functional programming patterns where applicable.\n- format: Single file or clearly separated code blocks.\n`;
-            if (complexity === 'expert') corePrompt += `- optimize for Big O time/space complexity.\n- Include unit test examples.\n`;
-          } else if (category === 'writing') {
-            corePrompt += `- Tone: ${tone}.\n- Avoid fluff, clichés, and passive voice.\n- Use strong verbs and evocative language.\n- Structure with clear headings and bullet points where appropriate.\n`;
-          } else if (category === 'business') {
-            corePrompt += `- Use a professional, authoritative tone (${tone}).\n- Focus on ROI and actionable steps.\n- Anticipate potential risks and offer mitigation strategies.\n`;
-          } else if (category === 'art') {
-            corePrompt += `- Specify aspect ratio, lighting, chaos parameter, and style reference.\n- Focus on visual descriptors (texture, color palette, angle).\n- Avoid abstract concepts; be concrete.\n`;
-          }
+            const responseData = await makeApiCall(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-          // 4. CHAIN OF THOUGHT / REASONING (The "Secret Sauce" for good AI results)
-          if (includeReasoning && category !== 'art') {
-            corePrompt += `\n## THINKING PROCESS\nBefore generating the final output, briefly outline your step-by-step reasoning or plan. Break down the problem to ensure no details are missed.\n`;
-          }
+            const text = responseData.candidates?.[0]?.content?.parts?.[0]?.text || 'Error: Could not generate prompt. Check the console for API response details.';
+            setGeneratedPrompt(text);
 
-          // 5. CRITIQUE LAYER (Self-Correction)
-          if (includeCritique && category !== 'art') {
-            corePrompt += `\n## QUALITY CHECK\nReview your output before finalizing. Ensure it strictly adheres to the constraints above. If there are trade-offs, explain them.\n`;
-          }
+            // Add to history only if successful
+            if (text && !text.startsWith('Error:')) {
+                const newEntry = {
+                    id: Date.now(),
+                    idea: idea.substring(0, 30) + (idea.length > 30 ? '...' : ''),
+                    fullPrompt: text,
+                    category: category,
+                    timestamp: new Date().toLocaleTimeString()
+                };
+                setHistory(prev => [newEntry, ...prev].slice(0, 10));
+            }
 
-          // 6. FINAL TRIGGER
-          corePrompt += `\n## FINAL OUTPUT\nProduce the final result below:`;
-
-          setGeneratedPrompt(corePrompt);
-          setIsGenerating(false);
-          
-          // Add to history
-          const newEntry = {
-            id: Date.now(),
-            idea: idea.substring(0, 30) + (idea.length > 30 ? '...' : ''),
-            fullPrompt: corePrompt,
-            category: category,
-            timestamp: new Date().toLocaleTimeString()
-          };
-          setHistory(prev => [newEntry, ...prev].slice(0, 10)); // Keep last 10
-        }, 800);
+        } catch (error) {
+            console.error("Gemini API Error:", error);
+            setGeneratedPrompt("An error occurred while communicating with the AI. Please check the console for network or API errors.");
+        } finally {
+            setIsGenerating(false);
+        }
       };
 
       const copyToClipboard = () => {
@@ -375,7 +420,7 @@
                     </div>
                   </div>
 
-                  {/* Generate Button */}
+                  {/* Generate Button (Now calls the Gemini API) */}
                   <button
                     onClick={generatePrompt}
                     disabled={!idea.trim() || isGenerating}
@@ -383,11 +428,11 @@
                   >
                     {isGenerating ? (
                       <>
-                        <RotateCcw className="animate-spin" size={20} /> Optimizing...
+                        <RotateCcw className="animate-spin" size={20} /> Optimizing with Gemini...
                       </>
                     ) : (
                       <>
-                        <Wand2 size={20} /> Generate Mega-Prompt
+                        <Wand2 size={20} /> Generate Mega-Prompt ✨
                       </>
                     )}
                   </button>
@@ -423,7 +468,7 @@
                           <Zap size={24} className="text-slate-500" />
                         </div>
                         <p className="text-center max-w-xs">
-                          Enter your idea on the left and hit generate to see the optimized prompt structure here.
+                          Enter your idea on the left and hit the sparkle button to generate the optimized prompt structure using Gemini.
                         </p>
                       </div>
                     )}
